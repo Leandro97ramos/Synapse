@@ -24,6 +24,9 @@ const FolderPanel = () => {
     const [assetSourceType, setAssetSourceType] = useState<'url' | 'file'>('url');
     const [newAssetUrl, setNewAssetUrl] = useState('');
     const [newAssetFile, setNewAssetFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
     const [targetFolderId, setTargetFolderId] = useState<number | string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,6 +61,22 @@ const FolderPanel = () => {
         fetchFolders();
     }, [moduleName]);
 
+    // Cleanup preview URL on unmount or when modal closes
+    useEffect(() => {
+        return () => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+        };
+    }, []);
+
+    const resetAssetForm = () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setNewAssetUrl('');
+        setNewAssetFile(null);
+        setPreviewUrl(null);
+        setIsAddSourceModalOpen(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const handleCreateFolder = async () => {
         if (!moduleId || !newFolderName.trim()) return;
         try {
@@ -78,6 +97,7 @@ const FolderPanel = () => {
         if (assetSourceType === 'file' && !newAssetFile) return;
 
         try {
+            setIsUploading(true);
             // Determine type hinted to backend (backend can auto-detect from file MIME too)
             let type = 'special';
             if (assetCategory === 'audio') type = 'audio';
@@ -87,20 +107,25 @@ const FolderPanel = () => {
 
             await createAsset(Number(targetFolderId), type, urlOrFile);
 
-            setIsAddSourceModalOpen(false);
-            setNewAssetUrl('');
-            setNewAssetFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            resetAssetForm();
             fetchFolders();
         } catch (error) {
             console.error("Error creating asset:", error);
             alert("Failed to create asset");
+        } finally {
+            setIsUploading(false);
         }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setNewAssetFile(e.target.files[0]);
+            const file = e.target.files[0];
+            setNewAssetFile(file);
+
+            // Generate Preview
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
         }
     };
 
@@ -322,7 +347,7 @@ const FolderPanel = () => {
             {/* Add Source Modal - Refactored */}
             <Modal
                 isOpen={isAddSourceModalOpen}
-                onClose={() => setIsAddSourceModalOpen(false)}
+                onClose={resetAssetForm}
                 title="Add New Asset"
             >
                 <div className="space-y-5">
@@ -345,7 +370,7 @@ const FolderPanel = () => {
                         <label className="block text-xs font-bold text-white/40 uppercase tracking-wider mb-2">Category</label>
                         <div className="grid grid-cols-2 gap-2 bg-black/20 p-1 rounded-lg">
                             <button
-                                onClick={() => setAssetCategory('visual')}
+                                onClick={() => { setAssetCategory('visual'); setPreviewUrl(null); }}
                                 className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${assetCategory === 'visual'
                                         ? 'bg-cyan-500/20 text-cyan-300 shadow-sm'
                                         : 'text-white/40 hover:text-white/60'
@@ -354,7 +379,7 @@ const FolderPanel = () => {
                                 Visual
                             </button>
                             <button
-                                onClick={() => setAssetCategory('audio')}
+                                onClick={() => { setAssetCategory('audio'); setPreviewUrl(null); }}
                                 className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${assetCategory === 'audio'
                                         ? 'bg-purple-500/20 text-purple-300 shadow-sm'
                                         : 'text-white/40 hover:text-white/60'
@@ -398,7 +423,7 @@ const FolderPanel = () => {
                             <div>
                                 <label className="block text-xs font-bold text-white/40 uppercase tracking-wider mb-2">Upload File</label>
                                 <div
-                                    className="border-2 border-dashed border-white/10 rounded-lg p-6 text-center hover:border-white/30 transition-colors cursor-pointer"
+                                    className="border-2 border-dashed border-white/10 rounded-lg p-6 text-center hover:border-white/30 transition-colors cursor-pointer relative"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <input
@@ -408,8 +433,21 @@ const FolderPanel = () => {
                                         className="hidden"
                                         accept={assetCategory === 'visual' ? "image/*,video/*" : "audio/*"}
                                     />
-                                    {newAssetFile ? (
-                                        <div className="text-cyan-300 font-medium truncate">{newAssetFile.name}</div>
+
+                                    {previewUrl ? (
+                                        <div className="mt-2 flex flex-col items-center">
+                                            {assetCategory === 'visual' ? (
+                                                newAssetFile?.type.startsWith('video') ? (
+                                                    <video src={previewUrl} className="max-h-32 rounded-lg" controls />
+                                                ) : (
+                                                    <img src={previewUrl} alt="Preview" className="max-h-32 rounded-lg object-contain" />
+                                                )
+                                            ) : (
+                                                <audio src={previewUrl} controls className="w-full mt-2" />
+                                            )}
+                                            <p className="text-cyan-300 text-sm mt-2 truncate max-w-full">{newAssetFile?.name}</p>
+                                            <p className="text-xs text-white/40 mt-1">Click to replace</p>
+                                        </div>
                                     ) : (
                                         <div className="text-white/40">
                                             <span className="block text-2xl mb-2">📁</span>
@@ -424,9 +462,20 @@ const FolderPanel = () => {
                     <div className="flex justify-end pt-4">
                         <button
                             onClick={handleCreateAsset}
-                            className="glass-button bg-cyan-500/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30 w-full justify-center"
+                            disabled={isUploading}
+                            className={`glass-button w-full justify-center flex items-center gap-2 ${isUploading
+                                    ? 'bg-white/5 text-white/40 cursor-not-allowed'
+                                    : 'bg-cyan-500/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30'
+                                }`}
                         >
-                            Add Asset
+                            {isUploading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                                    Uploading...
+                                </>
+                            ) : (
+                                'Add Asset'
+                            )}
                         </button>
                     </div>
                 </div>

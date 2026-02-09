@@ -49,7 +49,8 @@ CREATE TABLE `folders` (
 -- -----------------------------------------------------
 CREATE TABLE `assets` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `folder_id` INT NOT NULL,
+  `folder_id` INT NULL, -- Now Nullable for unlinked assets
+  `name` VARCHAR(255) NULL, -- Added Name column
   `type` ENUM('image', 'audio', 'video', 'special') NOT NULL,
   `url` VARCHAR(255) NOT NULL,
   `asset_settings` JSON NULL, -- Flexible asset config (e.g., {"volume": 0.8, "heartbeat_rate": 60})
@@ -58,7 +59,7 @@ CREATE TABLE `assets` (
   CONSTRAINT `fk_assets_folders`
     FOREIGN KEY (`folder_id`)
     REFERENCES `folders` (`id`)
-    ON DELETE CASCADE
+    ON DELETE SET NULL -- If folder deleted, assets become unlinked
     ON UPDATE CASCADE
 ) ENGINE = InnoDB;
 

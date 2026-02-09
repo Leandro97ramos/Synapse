@@ -19,8 +19,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-[#1a1a2e]/80 backdrop-blur-xl border border-white/10 p-6 text-left shadow-2xl transition-all animate-[fadeIn_0.3s_ease-out]">
-                <div className="flex items-center justify-between mb-6">
+            <div className="relative w-full max-w-md max-h-[90vh] flex flex-col transform rounded-2xl bg-[#1a1a2e]/80 backdrop-blur-xl border border-white/10 text-left shadow-2xl transition-all animate-[fadeIn_0.3s_ease-out]">
+                <div className="flex items-center justify-between p-6 border-b border-white/10 shrink-0">
                     <h3 className="text-xl font-bold text-white tracking-wide uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                         {title}
                     </h3>
@@ -32,7 +32,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
                     </button>
                 </div>
 
-                <div className="mt-2">
+                <div className="p-6 overflow-y-auto">
                     {children}
                 </div>
             </div>

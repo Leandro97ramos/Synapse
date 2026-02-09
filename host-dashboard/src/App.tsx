@@ -19,7 +19,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard/:moduleName" element={<DashboardPage />} />
+        <Route path="/dashboard/:moduleName/folder/:folderId" element={<DashboardPage />} />
       </Routes>
     </BrowserRouter>
   );

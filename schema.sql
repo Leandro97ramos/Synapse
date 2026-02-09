@@ -1,7 +1,12 @@
 -- Database Schema for VR Experience System (Scalable JSON Version)
 -- Generated for MySQL 5.7+
 
+-- Ensure database exists
+CREATE DATABASE IF NOT EXISTS `synapse_vr`;
+USE `synapse_vr`;
+
 SET FOREIGN_KEY_CHECKS = 0;
+
 
 -- Drop previous tables if they exist to ensure clean state
 DROP TABLE IF EXISTS `settings`; -- Dropping old table if present
@@ -63,7 +68,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- Seed Data
 -- -----------------------------------------------------
 
--- 1. Insert 'Bubbles' Module (Relaxation)
+-- 1. Insert 'Bubbles' Module (Relaxation) - Active
 INSERT INTO `modules` (`name`, `category_type`, `is_active`, `global_settings`) 
 VALUES (
     'Bubbles', 
@@ -72,12 +77,31 @@ VALUES (
     '{"speed": 1.5, "float_direction": "up", "background_color": "#001133"}'
 );
 
+-- 2. Insert 'Paisajes' Module (Landscapes) - Inactive
+INSERT INTO `modules` (`name`, `category_type`, `is_active`, `global_settings`) 
+VALUES (
+    'Paisajes', 
+    'landscapes', 
+    0, 
+    '{"day_cycle": true, "weather": "sunny", "ambient_volume": 0.5}'
+);
+
+-- 3. Insert 'Terror' Module (Horror) - Inactive
 INSERT INTO `modules` (`name`, `category_type`, `is_active`, `global_settings`) 
 VALUES (
     'Terror', 
-    'terror', 
-    1, 
-{"blood_intensity": 5, "flicker_speed": 0.8}
+    'horror', 
+    0, 
+    '{"darkness_level": 0.9, "jump_scare_enabled": true, "pulse_sync": false}'
+);
+
+-- 4. Insert 'Adrenalina' Module (Adrenaline) - Inactive
+INSERT INTO `modules` (`name`, `category_type`, `is_active`, `global_settings`) 
+VALUES (
+    'Adrenalina', 
+    'adrenaline', 
+    0, 
+    '{"motion_blur": true, "speed_multiplier": 2.0, "intensity": "high"}'
 );
 
 
@@ -107,7 +131,53 @@ INSERT INTO `assets` (`folder_id`, `type`, `url`, `asset_settings`)
 SELECT `id`, 'special', 'https://example.com/assets/heartbeat_pattern.json', '{"effect": "heartbeat", "intensity": 0.7}'
 FROM `folders` WHERE `name` = 'Carpeta 1' AND `module_id` = (SELECT `id` FROM `modules` WHERE `name` = 'Bubbles');
 
--- Verification helpers (Optional, commented out)
--- SELECT * FROM modules;
--- SELECT * FROM folders;
--- SELECT * FROM assets;
+-- -----------------------------------------------------
+-- Triggers for Default JSON Values (MySQL 5.7 Compatibility)
+-- Since MySQL 5.7 does not support DEFAULT values for JSON columns
+-- -----------------------------------------------------
+
+DELIMITER //
+
+CREATE TRIGGER `modules_before_insert` BEFORE INSERT ON `modules`
+FOR EACH ROW
+BEGIN
+  IF NEW.global_settings IS NULL THEN
+    SET NEW.global_settings = '{}';
+  END IF;
+END;
+//
+
+CREATE TRIGGER `folders_before_insert` BEFORE INSERT ON `folders`
+FOR EACH ROW
+BEGIN
+  IF NEW.folder_settings IS NULL THEN
+    SET NEW.folder_settings = '{}';
+  END IF;
+END;
+//
+
+CREATE TRIGGER `assets_before_insert` BEFORE INSERT ON `assets`
+FOR EACH ROW
+BEGIN
+  IF NEW.asset_settings IS NULL THEN
+    SET NEW.asset_settings = '{}';
+  END IF;
+END;
+//
+
+DELIMITER ;
+
+-- -----------------------------------------------------
+-- Debug Query: Count assets per active module
+-- -----------------------------------------------------
+/*
+SELECT 
+    m.name AS ModuleName, 
+    COUNT(a.id) AS TotalAssets,
+    m.is_active
+FROM modules m
+LEFT JOIN folders f ON m.id = f.module_id
+LEFT JOIN assets a ON f.id = a.folder_id
+GROUP BY m.id;
+*/
+

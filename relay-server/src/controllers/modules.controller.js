@@ -1,5 +1,17 @@
 const db = require('../config/db.config');
 
+exports.getAllModules = async (req, res) => {
+    try {
+        const [modules] = await db.query(
+            'SELECT id, name, category_type, is_active FROM modules'
+        );
+        res.json(modules);
+    } catch (error) {
+        console.error('Error fetching modules:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
 exports.getModuleByName = async (req, res) => {
     try {
         const moduleName = req.params.name;

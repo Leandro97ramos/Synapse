@@ -17,6 +17,13 @@ module.exports = (io) => {
             socket.to('viewer').emit('viewer:sync_settings', data);
         });
 
+        // Relay 'host:update_session' event to viewers (New Implementation)
+        socket.on('host:update_session', (data) => {
+             console.log('Event: host:update_session', data);
+             // Broadcast to all clients in 'viewer' room
+             socket.to('viewer').emit('viewer:update_session', data);
+        });
+
         // Relay 'change_folder' event to viewers
         socket.on('change_folder', (data) => {
             console.log('Event: change_folder', data);

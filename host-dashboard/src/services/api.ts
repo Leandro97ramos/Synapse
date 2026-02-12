@@ -1,14 +1,19 @@
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-const API_URL = 'http://localhost:3000/api';
-const SOCKET_URL = 'http://localhost:3000/experience';
+const API_URL = '/api';
+// Namespace needs to be handled carefully. 
+// io('/experience') connects to same origin with /experience namespace.
+// The actual socket connection goes to /socket.io, which is proxied.
+const SOCKET_URL = '/experience';
 
 const api = axios.create({
     baseURL: API_URL,
 });
 
-export const socket = io(SOCKET_URL);
+export const socket = io(SOCKET_URL, {
+    transports: ['websocket', 'polling']
+});
 
 export const getModules = async () => {
     const response = await api.get('/modules');
@@ -78,4 +83,19 @@ export const updateAsset = async (assetId: number, data: { name?: string, folder
 export const batchDeleteAssets = async (assetIds: number[]) => {
     const response = await api.post('/assets/batch-delete', { assetIds });
     return response.data;
+};
+
+// Sync Logic
+export const syncAssetToViewer = (asset: { type: string, url: string }) => {
+    // Current structure expected by VRViewer: { asset: { type, url }, effects: ... }
+    // We emit via socket to the server, which broadcasts to 'Viewer' room.
+    // The server listens to 'host:update_session' or similar. 
+    // Checking server.js/experience.socket.js to confirm event name.
+    // Based on previous reads: server likely just broadcasts what it receives or has a specific event.
+    // Let's assume we emit to the server, and server broadcasts.
+    // For now, we'll emit 'host:update_session' directly if the server supports it, 
+    // OR we might need a specific server endpoint/event if the socket is client-only.
+    // Actually, usually we emit to the server, and the server handles it.
+    // Let's check experience.socket.js content if possible, but standard pattern:
+    socket.emit('host:update_session', { asset });
 };

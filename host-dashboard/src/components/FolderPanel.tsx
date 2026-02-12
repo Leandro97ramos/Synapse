@@ -193,9 +193,6 @@ const FolderPanel = () => {
                     >
                         + New Folder
                     </button>
-                    <button className="glass-button">
-                        Scan Library
-                    </button>
                 </div>
             </header>
 
@@ -372,8 +369,8 @@ const FolderPanel = () => {
                             <button
                                 onClick={() => { setAssetCategory('visual'); setPreviewUrl(null); }}
                                 className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${assetCategory === 'visual'
-                                        ? 'bg-cyan-500/20 text-cyan-300 shadow-sm'
-                                        : 'text-white/40 hover:text-white/60'
+                                    ? 'bg-cyan-500/20 text-cyan-300 shadow-sm'
+                                    : 'text-white/40 hover:text-white/60'
                                     }`}
                             >
                                 Visual
@@ -381,8 +378,8 @@ const FolderPanel = () => {
                             <button
                                 onClick={() => { setAssetCategory('audio'); setPreviewUrl(null); }}
                                 className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${assetCategory === 'audio'
-                                        ? 'bg-purple-500/20 text-purple-300 shadow-sm'
-                                        : 'text-white/40 hover:text-white/60'
+                                    ? 'bg-purple-500/20 text-purple-300 shadow-sm'
+                                    : 'text-white/40 hover:text-white/60'
                                     }`}
                             >
                                 Audio
@@ -464,8 +461,8 @@ const FolderPanel = () => {
                             onClick={handleCreateAsset}
                             disabled={isUploading}
                             className={`glass-button w-full justify-center flex items-center gap-2 ${isUploading
-                                    ? 'bg-white/5 text-white/40 cursor-not-allowed'
-                                    : 'bg-cyan-500/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30'
+                                ? 'bg-white/5 text-white/40 cursor-not-allowed'
+                                : 'bg-cyan-500/20 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30'
                                 }`}
                         >
                             {isUploading ? (

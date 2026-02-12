@@ -140,6 +140,11 @@ const Home = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Install App Button Container */}
+                <div className="mt-8 flex justify-center">
+                    <InstallAppButton />
+                </div>
             </div>
 
             {/* Bottom Footer */}
@@ -155,6 +160,63 @@ const Home = () => {
                 }
             `}</style>
         </div>
+    );
+};
+
+const InstallAppButton = () => {
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [isIOS, setIsIOS] = useState(false);
+    const [isStandalone, setIsStandalone] = useState(false);
+
+    useEffect(() => {
+        // Check for iOS
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        setIsIOS(isIos);
+
+        // Check if already in standalone mode
+        const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+        setIsStandalone(standalone);
+
+        if (!standalone) {
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                setDeferredPrompt(e);
+            });
+        }
+    }, []);
+
+    const handleInstallClick = () => {
+        if (isIOS) {
+            alert("To install on iOS: Tap the 'Share' button and select 'Add to Home Screen'.");
+        } else if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult: any) => {
+                if (choiceResult.outcome === 'accepted') {
+                    setDeferredPrompt(null);
+                }
+            });
+        } else {
+            alert("To install: Tap your browser menu and select 'Install App' or 'Add to Home Screen'.");
+        }
+    };
+
+    if (isStandalone) return null;
+
+    return (
+        <button
+            onClick={handleInstallClick}
+            className="group flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300 backdrop-blur-sm"
+        >
+            <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full shadow-lg group-hover:shadow-[0_0_15px_cyan] transition-shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+            </div>
+            <div className="text-left">
+                <span className="block text-xs text-white/40 uppercase tracking-wider font-bold">Get the App</span>
+                <span className="block text-sm text-white font-medium group-hover:text-cyan-300 transition-colors">Download for VR</span>
+            </div>
+        </button>
     );
 };
 

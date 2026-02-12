@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getModuleByName, updateAsset, getModules, batchDeleteAssets } from '../services/api';
+import { getModuleByName, updateAsset, getModules, batchDeleteAssets, syncAssetToViewer } from '../services/api';
 import Modal from './Modal';
+import { getAssetUrl } from '../utils/urlHelper';
 
 const AssetViewer = () => {
     const { moduleName, folderId } = useParams();
@@ -145,20 +146,22 @@ const AssetViewer = () => {
             alert("Error loading media. Please check the URL or file.");
         };
 
+        const safeUrl = getAssetUrl(previewAsset.url);
+
         switch (previewAsset.type) {
             case 'image':
                 return (
-                    <img key={previewAsset.url} src={previewAsset.url} alt="Preview" className="max-w-full max-h-[70vh] rounded-lg shadow-2xl" onError={handleMediaError} />
+                    <img key={safeUrl} src={safeUrl} alt="Preview" className="max-w-full max-h-[70vh] rounded-lg shadow-2xl" onError={handleMediaError} />
                 );
             case 'video':
                 return (
-                    <video key={previewAsset.url} controls autoPlay src={previewAsset.url} className="max-w-full max-h-[70vh] rounded-lg shadow-2xl" onError={handleMediaError} />
+                    <video key={safeUrl} controls autoPlay src={safeUrl} className="max-w-full max-h-[70vh] rounded-lg shadow-2xl" onError={handleMediaError} />
                 );
             case 'audio':
                 return (
                     <div className="w-full flex flex-col items-center justify-center p-10 bg-black/20 rounded-xl">
                         <div className="text-6xl mb-6 animate-pulse">🎵</div>
-                        <audio key={previewAsset.url} controls autoPlay src={previewAsset.url} className="w-full" onError={handleMediaError}>Your browser does not support the audio element.</audio>
+                        <audio key={safeUrl} controls autoPlay src={safeUrl} className="w-full" onError={handleMediaError}>Your browser does not support the audio element.</audio>
                     </div>
                 );
             case 'special':
@@ -249,20 +252,31 @@ const AssetViewer = () => {
                                 )}
 
                                 <div className="flex-1 rounded-lg bg-black/20 mb-3 overflow-hidden relative flex items-center justify-center">
-                                    {asset.type === 'image' && <img src={asset.url} alt="Asset" className="w-full h-full object-cover opacity-80 group-hover/asset:opacity-100 transition-opacity" />}
+                                    {asset.type === 'image' && <img src={getAssetUrl(asset.url)} alt="Asset" className="w-full h-full object-cover opacity-80 group-hover/asset:opacity-100 transition-opacity" />}
                                     {['audio', 'video', 'special'].includes(asset.type) && <div className="text-4xl">{asset.type === 'audio' ? '🎵' : asset.type === 'video' ? '🎬' : '✨'}</div>}
                                 </div>
                                 <div className="flex justify-between items-center relative z-10">
                                     <span className="text-xs text-white/60 uppercase tracking-wider truncate max-w-[80px]">{asset.name || asset.type}</span>
-                                    {!isSelectionMode && (
-                                        <button
-                                            onClick={(e) => openRenameModal(e, asset)}
-                                            className="text-white/20 hover:text-white transition-colors p-1"
-                                            title="Rename"
-                                        >
-                                            ✎
-                                        </button>
-                                    )}
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                        {!isSelectionMode && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); syncAssetToViewer(asset); }}
+                                                    className="text-white/40 hover:text-yellow-400 transition-colors p-1"
+                                                    title="Sync to VR"
+                                                >
+                                                    ⚡
+                                                </button>
+                                                <button
+                                                    onClick={(e) => openRenameModal(e, asset)}
+                                                    className="text-white/20 hover:text-white transition-colors p-1"
+                                                    title="Rename"
+                                                >
+                                                    ✎
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}

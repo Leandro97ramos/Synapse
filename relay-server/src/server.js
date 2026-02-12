@@ -1,14 +1,20 @@
 // Load environment variables
 require('dotenv').config();
 
-const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const socketIo = require('socket.io');
 const app = require('./app');
 const experienceSocket = require('./sockets/experience.socket');
 
 const PORT = process.env.PORT || 3000;
 
-const server = http.createServer(app);
+const options = {
+    key: fs.readFileSync('./certs/key.pem'),
+    cert: fs.readFileSync('./certs/cert.pem')
+};
+
+const server = https.createServer(options, app);
 
 const io = socketIo(server, {
     cors: {

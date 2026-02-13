@@ -26,6 +26,7 @@ const io = socketIo(server, {
 // Initialize Sockets
 experienceSocket(io);
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Listening on all network interfaces (IPv4/IPv6)`);
 });

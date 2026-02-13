@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -40,21 +41,22 @@ export default defineConfig({
   ],
   server: {
     host: true, // Expose to network
+    https: {},
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://localhost:3000',
+        target: 'https://127.0.0.1:3000',
         changeOrigin: true,
         secure: false
       },
       '/socket.io': {
-        target: 'https://localhost:3000',
+        target: 'https://127.0.0.1:3000',
         changeOrigin: true,
         ws: true,
         secure: false
       },
       '/uploads': {
-        target: 'https://localhost:3000',
+        target: 'https://127.0.0.1:3000',
         changeOrigin: true,
         secure: false
       }

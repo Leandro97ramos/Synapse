@@ -9,6 +9,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 -- Drop previous tables if they exist to ensure clean state
+DROP TABLE IF EXISTS `calibration_profiles`;
+DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `settings`; -- Dropping old table if present
 DROP TABLE IF EXISTS `assets`;
 DROP TABLE IF EXISTS `folders`;
@@ -51,7 +53,7 @@ CREATE TABLE `assets` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `folder_id` INT NULL, -- Now Nullable for unlinked assets
   `name` VARCHAR(255) NULL, -- Added Name column
-  `type` ENUM('image', 'audio', 'video', 'special') NOT NULL,
+  `type` ENUM('image', 'audio', 'video', 'gif', 'special') NOT NULL,
   `url` VARCHAR(255) NOT NULL,
   `asset_settings` JSON NULL, -- Flexible asset config (e.g., {"volume": 0.8, "heartbeat_rate": 60})
   PRIMARY KEY (`id`),
@@ -63,11 +65,43 @@ CREATE TABLE `assets` (
     ON UPDATE CASCADE
 ) ENGINE = InnoDB;
 
+-- -----------------------------------------------------
+-- Table: users
+-- -----------------------------------------------------
+CREATE TABLE `users` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(50) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `username_UNIQUE` (`username` ASC)
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table: calibration_profiles
+-- -----------------------------------------------------
+CREATE TABLE `calibration_profiles` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `user_id` INT NOT NULL,
+  `profile_name` VARCHAR(100) NOT NULL,
+  `calibration_data` JSON NOT NULL, -- Stores IPD, scale, vOffset, etc.
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `fk_profiles_users_idx` (`user_id` ASC),
+  CONSTRAINT `fk_profiles_users`
+    FOREIGN KEY (`user_id`)
+    REFERENCES `users` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- -----------------------------------------------------
 -- Seed Data
 -- -----------------------------------------------------
+
+-- 0. Insert Default User
+INSERT INTO `users` (`username`) VALUES ('Guest');
 
 -- 1. Insert 'Bubbles' Module (Relaxation) - Active
 INSERT INTO `modules` (`name`, `category_type`, `is_active`, `global_settings`) 

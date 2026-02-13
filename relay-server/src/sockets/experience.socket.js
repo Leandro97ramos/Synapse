@@ -1,3 +1,17 @@
+const os = require('os');
+
+const getLocalIp = () => {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+};
+
 module.exports = (io) => {
     const experienceNamespace = io.of('/experience');
 
@@ -11,17 +25,32 @@ module.exports = (io) => {
         });
 
         // Relay 'host:update_settings' event to viewers
-        // Payload is the JSON object to be broadcasted directly
         socket.on('host:update_settings', (data) => {
             console.log('Event: host:update_settings', data);
             socket.to('viewer').emit('viewer:sync_settings', data);
         });
 
-        // Relay 'host:update_session' event to viewers (New Implementation)
+        // Relay 'host:update_session' event to viewers (Corrected for Local IP)
         socket.on('host:update_session', (data) => {
-             console.log('Event: host:update_session', data);
-             // Broadcast to all clients in 'viewer' room
-             socket.to('viewer').emit('viewer:update_session', data);
+            console.log('Event: host:update_session (Original):', data);
+
+            // Ensure the URL uses the Local IP instead of localhost
+            if (data.asset && data.asset.url) {
+                const localIp = getLocalIp();
+                // Replace localhost or 127.0.0.1 with the actual LAN IP
+                // Also ensure protocol is https if server is https, but we'll respect original for now unless it's just replacing the host
+                data.asset.url = data.asset.url.replace(/localhost|127\.0\.0\.1/g, localIp);
+            }
+
+            console.log('Event: viewer:update_session (Broadcast):', data);
+            // Broadcast to all clients in 'viewer' room
+            socket.to('viewer').emit('viewer:update_session', data);
+        });
+
+        // Relay 'host:calibration' to viewers
+        socket.on('host:calibration', (data) => {
+            console.log('Event: host:calibration', data);
+            socket.to('viewer').emit('viewer:calibration', data);
         });
 
         // Relay 'change_folder' event to viewers

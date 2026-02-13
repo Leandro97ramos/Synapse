@@ -87,15 +87,36 @@ export const batchDeleteAssets = async (assetIds: number[]) => {
 
 // Sync Logic
 export const syncAssetToViewer = (asset: { type: string, url: string }) => {
-    // Current structure expected by VRViewer: { asset: { type, url }, effects: ... }
-    // We emit via socket to the server, which broadcasts to 'Viewer' room.
-    // The server listens to 'host:update_session' or similar. 
-    // Checking server.js/experience.socket.js to confirm event name.
-    // Based on previous reads: server likely just broadcasts what it receives or has a specific event.
-    // Let's assume we emit to the server, and server broadcasts.
-    // For now, we'll emit 'host:update_session' directly if the server supports it, 
-    // OR we might need a specific server endpoint/event if the socket is client-only.
-    // Actually, usually we emit to the server, and the server handles it.
-    // Let's check experience.socket.js content if possible, but standard pattern:
-    socket.emit('host:update_session', { asset });
+    // 1. Obtenemos la IP real desde la que estás usando el Dashboard (ej: 192.168.0.103)
+    const currentHost = window.location.hostname;
+
+    // 2. Transformamos la URL de localhost a la IP real y aseguramos HTTPS
+    const reachableUrl = asset.url
+        .replace('localhost', currentHost) // Cambia localhost por tu IP real
+        .replace('http://', 'https://');   // Evita bloqueos por "Mixed Content" en el celular
+
+    console.log('📡 Sincronizando Asset:', reachableUrl);
+
+    // 3. Enviamos el asset corregido al servidor
+    socket.emit('host:update_session', {
+        asset: {
+            ...asset,
+            url: reachableUrl
+        }
+    });
+};
+
+export const sendCalibration = (data: { ipd: number; scale: number; vOffset: number }) => {
+    socket.emit('host:calibration', data);
+};
+
+// Calibration Profiles
+export const saveProfile = async (userId: number, profileName: string, calibrationData: object) => {
+    const response = await api.post('/profiles', { user_id: userId, profile_name: profileName, calibration_data: calibrationData });
+    return response.data;
+};
+
+export const getProfiles = async (userId: number) => {
+    const response = await api.get(`/profiles/${userId}`);
+    return response.data;
 };

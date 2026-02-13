@@ -1,7 +1,18 @@
-const db = require('../config/db.config');
+const os = require('os');
 const mime = require('mime-types');
-const fs = require('fs');
-const path = require('path');
+const db = require('../config/db.config');
+const getLocalIp = () => {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal (i.e. 127.0.0.1) and non-IPv4 addresses
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+};
 
 exports.createAsset = async (req, res) => {
     try {
@@ -15,12 +26,18 @@ exports.createAsset = async (req, res) => {
 
         // Handle File Upload
         if (req.file) {
-            url = `http://${req.get('host')}/uploads/${req.file.filename}`;
+            const protocol = req.protocol; // http or https
+            const host = getLocalIp();
+            const port = 3000; // Or req.get('host').split(':')[1] if variable
+            // Construct URL dynamically using IP
+            url = `${protocol}://${host}:${port}/uploads/${req.file.filename}`;
+
             if (!name) name = req.file.originalname; // Default name from file
 
             const mimeType = mime.lookup(req.file.originalname);
             if (mimeType) {
-                if (mimeType.startsWith('image/')) type = 'image';
+                if (mimeType === 'image/gif') type = 'gif';
+                else if (mimeType.startsWith('image/')) type = 'image';
                 else if (mimeType.startsWith('video/')) type = 'video';
                 else if (mimeType.startsWith('audio/')) type = 'audio';
                 else type = 'special';
@@ -39,7 +56,7 @@ exports.createAsset = async (req, res) => {
         }
 
         // Validate type enum helper
-        const validTypes = ['image', 'audio', 'video', 'special'];
+        const validTypes = ['image', 'audio', 'video', 'gif', 'special'];
         if (!validTypes.includes(type)) {
             return res.status(400).json({ message: 'Invalid asset type' });
         }

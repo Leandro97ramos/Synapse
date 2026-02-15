@@ -7,6 +7,14 @@ const socketIo = require('socket.io');
 const app = require('./app');
 const experienceSocket = require('./sockets/experience.socket');
 
+// Routes
+const assetRoutes = require('./routes/assets.routes');
+const folderRoutes = require('./routes/folders.routes');
+const moduleRoutes = require('./routes/modules.routes');
+const profileRoutes = require('./routes/profiles.routes');
+const mediaRoutes = require('./routes/media.routes');
+const eventLogger = require('./middleware/eventLogger');
+
 const PORT = process.env.PORT || 3000;
 
 const options = {
@@ -22,6 +30,9 @@ const io = socketIo(server, {
         methods: ["GET", "POST"]
     }
 });
+
+// Socket.io Middleware
+io.of('/experience').use(eventLogger);
 
 // Initialize Sockets
 experienceSocket(io);

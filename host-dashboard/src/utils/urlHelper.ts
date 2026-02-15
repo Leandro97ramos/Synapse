@@ -12,9 +12,11 @@ export const getAssetUrl = (url: string): string => {
         // Extract the part starting from /uploads/
         const relativePath = url.split('/uploads/')[1];
         if (relativePath) {
+            console.log('[DEBUG] getAssetUrl transform:', url, '->', `/uploads/${relativePath}`);
             return `/uploads/${relativePath}`;
         }
     }
+    console.log('[DEBUG] getAssetUrl no-transform:', url);
 
     // Return original for external URLs or if parsing failed
     return url;

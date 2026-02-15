@@ -58,6 +58,9 @@ const FolderPanel = () => {
     };
 
     useEffect(() => {
+        if (moduleName) {
+            localStorage.setItem('lastModule', moduleName);
+        }
         fetchFolders();
     }, [moduleName]);
 
@@ -105,7 +108,7 @@ const FolderPanel = () => {
 
             const urlOrFile = assetSourceType === 'file' ? newAssetFile! : newAssetUrl;
 
-            await createAsset(Number(targetFolderId), type, urlOrFile);
+            await createAsset(Number(targetFolderId), type, urlOrFile, undefined, moduleId || undefined);
 
             resetAssetForm();
             fetchFolders();

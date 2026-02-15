@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getModuleByName, updateAsset, getModules, batchDeleteAssets, syncAssetToViewer } from '../services/api';
 import Modal from './Modal';
 import { getAssetUrl } from '../utils/urlHelper';
+import { getFileType } from '../utils/fileHelpers';
 
 const AssetViewer = () => {
     const { moduleName, folderId } = useParams();
@@ -143,15 +144,30 @@ const AssetViewer = () => {
 
         const handleMediaError = (e: any) => {
             console.error("Media Error:", e);
-            alert("Error loading media. Please check the URL or file.");
+            e.currentTarget.style.display = 'none'; // Hide broken image
+            e.currentTarget.nextElementSibling?.classList.remove('hidden'); // Show fallback if any
         };
 
         const safeUrl = getAssetUrl(previewAsset.url);
+        const fileType = getFileType(previewAsset.url, previewAsset.mimetype);
 
-        switch (previewAsset.type) {
+        switch (fileType) {
             case 'image':
+            case 'gif':
                 return (
-                    <img key={safeUrl} src={safeUrl} alt="Preview" className="max-w-full max-h-[70vh] rounded-lg shadow-2xl" onError={handleMediaError} />
+                    <div className="relative flex justify-center items-center">
+                        <img
+                            key={safeUrl}
+                            src={safeUrl}
+                            alt="Preview"
+                            className="max-w-full max-h-[70vh] rounded-lg shadow-2xl"
+                            onError={handleMediaError}
+                        />
+                        <div className="hidden absolute text-white/50 flex flex-col items-center">
+                            <span className="text-4xl mb-2">⚠️</span>
+                            <span>Failed to load image</span>
+                        </div>
+                    </div>
                 );
             case 'video':
                 return (
@@ -164,15 +180,22 @@ const AssetViewer = () => {
                         <audio key={safeUrl} controls autoPlay src={safeUrl} className="w-full" onError={handleMediaError}>Your browser does not support the audio element.</audio>
                     </div>
                 );
-            case 'special':
+            default:
+                // Fallback for explicitly handled 'special' or unknown
+                if (previewAsset.type === 'special') {
+                    return (
+                        <div className="w-full flex flex-col items-center justify-center p-10 bg-black/20 rounded-xl">
+                            <div className="text-6xl mb-6 text-yellow-400">✨</div>
+                            <p className="text-white/80 font-mono text-sm break-all">{previewAsset.url}</p>
+                        </div>
+                    );
+                }
                 return (
-                    <div className="w-full flex flex-col items-center justify-center p-10 bg-black/20 rounded-xl">
-                        <div className="text-6xl mb-6 text-yellow-400">✨</div>
-                        <p className="text-white/80 font-mono text-sm break-all">{previewAsset.url}</p>
+                    <div className="text-center p-10">
+                        <p className="text-white/50 mb-2">Unsupported Preview Format</p>
+                        <p className="text-xs text-white/30 font-mono">{previewAsset.type} / {fileType}</p>
                     </div>
                 );
-            default:
-                return <p className="text-white/50">Unsupported format</p>;
         }
     };
 
@@ -252,8 +275,35 @@ const AssetViewer = () => {
                                 )}
 
                                 <div className="flex-1 rounded-lg bg-black/20 mb-3 overflow-hidden relative flex items-center justify-center">
-                                    {asset.type === 'image' && <img src={getAssetUrl(asset.url)} alt="Asset" className="w-full h-full object-cover opacity-80 group-hover/asset:opacity-100 transition-opacity" />}
-                                    {['audio', 'video', 'special'].includes(asset.type) && <div className="text-4xl">{asset.type === 'audio' ? '🎵' : asset.type === 'video' ? '🎬' : '✨'}</div>}
+                                    {(asset.type === 'image' || asset.type === 'gif') && (
+                                        <img
+                                            src={getAssetUrl(asset.url)}
+                                            alt="Asset"
+                                            className="w-full h-full object-cover opacity-80 group-hover/asset:opacity-100 transition-opacity"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.parentElement?.classList.add('bg-red-500/20');
+                                            }}
+                                        />
+                                    )}
+                                    {asset.type === 'video' && (
+                                        <video
+                                            src={getAssetUrl(asset.url)}
+                                            className="w-full h-full object-cover opacity-80 group-hover/asset:opacity-100 transition-opacity"
+                                            muted
+                                            playsInline
+                                            onMouseOver={(e) => e.currentTarget.play()}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.pause();
+                                                e.currentTarget.currentTime = 0;
+                                            }}
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.parentElement?.classList.add('bg-red-500/20');
+                                            }}
+                                        />
+                                    )}
+                                    {['audio', 'special'].includes(asset.type) && <div className="text-4xl">{asset.type === 'audio' ? '🎵' : '✨'}</div>}
                                 </div>
                                 <div className="flex justify-between items-center relative z-10">
                                     <span className="text-xs text-white/60 uppercase tracking-wider truncate max-w-[80px]">{asset.name || asset.type}</span>

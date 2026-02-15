@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getModules, syncAssetToViewer, sendIntensity, sendFlash } from '../services/api';
+import { getModules, syncAssetToViewer, sendIntensity, sendFlash, sendInduction } from '../services/api';
 import { getAssetUrl } from '../utils/urlHelper';
+import { useActiveState } from './ActiveStateContext';
+
+// Define Induction Layer States (Local for now, eventually synced)
+interface InductionState {
+    spiral: boolean;
+    flashback: boolean;
+    breathing: boolean;
+}
 
 const DirectorPanel = () => {
     const navigate = useNavigate();
+    const { activeState } = useActiveState();
 
     // Data State
     const [folders, setFolders] = useState<any[]>([]);
@@ -21,17 +30,22 @@ const DirectorPanel = () => {
     const [timeLeft, setTimeLeft] = useState(0);
     const timerRef = useRef<number | null>(null);
 
+    // Induction Layers
+    const [induction, setInduction] = useState<InductionState>({
+        spiral: false,
+        flashback: false,
+        breathing: false
+    });
+
     // Initial Fetch
     useEffect(() => {
         const fetchFolders = async () => {
             try {
-                // Fetch all modules to get folders (Phases)
                 const modules = await getModules();
                 const allFolders: any[] = [];
                 modules.forEach((m: any) => {
                     if (m.folders) {
                         m.folders.forEach((f: any) => {
-                            // Only include folders that have assets? Or all?
                             allFolders.push({ ...f, moduleName: m.name });
                         });
                     }
@@ -53,8 +67,7 @@ const DirectorPanel = () => {
             if (folder && folder.assets) {
                 setAssets(folder.assets);
                 setCurrentIndex(0);
-                setIsPlaying(true); // Auto-start playing folder? Or wait for user?
-                // Logic: "Organize media by Intensity Phases". Click phase -> load assets.
+                setIsPlaying(true);
             } else {
                 setAssets([]);
             }
@@ -67,11 +80,18 @@ const DirectorPanel = () => {
         sendIntensity(val);
     };
 
-    // calculate timer interval
-    // T = 11 - Intensity (1 -> 10s, 10 -> 1s)
-    const getIntervalMs = () => (11 - intensity) * 1000;
+    // Toggle Induction Layer
+    const toggleInduction = (layer: keyof InductionState) => {
+        setInduction(prev => {
+            const newState = { ...prev, [layer]: !prev[layer] };
+            sendInduction(layer, newState[layer]);
+            return newState;
+        });
+    };
 
     // Timer Logic
+    const getIntervalMs = () => (11 - intensity) * 1000;
+
     useEffect(() => {
         if (!isPlaying || assets.length === 0) {
             setTimeLeft(0);
@@ -81,13 +101,9 @@ const DirectorPanel = () => {
         const intervalMs = getIntervalMs();
         let startTime = Date.now();
 
-        // Use recursive setTimeout or requestAnimationFrame for visual sync?
-        // User asked for "setInterval or requestAnimationFrame for local dashboard timer... synced visually".
-
         const tick = () => {
             const elapsed = Date.now() - startTime;
             const remaining = Math.max(0, intervalMs - elapsed);
-
             setTimeLeft(remaining);
 
             if (remaining <= 0) {
@@ -101,11 +117,8 @@ const DirectorPanel = () => {
         };
 
         timerRef.current = requestAnimationFrame(tick);
-
-        return () => {
-            if (timerRef.current) cancelAnimationFrame(timerRef.current);
-        };
-    }, [isPlaying, assets, currentIndex, intensity]); // Dependencies restart timer logic
+        return () => { if (timerRef.current) cancelAnimationFrame(timerRef.current); };
+    }, [isPlaying, assets, currentIndex, intensity]);
 
     const handleNext = () => {
         if (assets.length === 0) return;
@@ -114,16 +127,18 @@ const DirectorPanel = () => {
         syncAsset(assets[nextIndex]);
     };
 
+    const jumpToAsset = (index: number) => {
+        setCurrentIndex(index);
+        syncAsset(assets[index]);
+        // Reset timer implicitly? Yes, effect dependency
+    };
+
     const handleNextNow = () => {
-        // "Siguiente Ahora" - Skip timer
         handleNext();
-        // Reset timer implicitly by effect dependency change (currentIndex) -> wait, effect depends on currentIndex?
-        // Yes, if currentIndex changes, effect reruns, resetting startTime.
     };
 
     const handleFlash = () => {
         sendFlash();
-        // Visual feedback
         const btn = document.getElementById('flash-btn');
         if (btn) {
             btn.classList.add('animate-[flash_0.2s_ease-in-out]');
@@ -133,121 +148,171 @@ const DirectorPanel = () => {
 
     const syncAsset = (asset: any) => {
         syncAssetToViewer(asset);
-        // Also emit 'host:next' if useful, but update_session does the job.
     };
 
-    // Toggle Play/Pause
     const togglePlay = () => setIsPlaying(!isPlaying);
 
-    if (loading) {
-        return <div className="flex h-screen items-center justify-center bg-[#050510] text-white">Loading...</div>;
-    }
+    if (loading) return <div className="flex h-screen items-center justify-center bg-[#050510] text-white">Loading...</div>;
+
+    const currentAsset = assets[currentIndex];
 
     return (
-        <div className="flex h-screen bg-[#050510] text-white">
-            {/* Left Sidebar: Phases / Folders */}
-            <div className="w-64 bg-black/20 border-r border-white/10 p-4 overflow-y-auto">
-                <button onClick={() => navigate('/')} className="mb-6 text-white/50 hover:text-white">← Back</button>
-                <h2 className="text-xl font-light tracking-widest mb-4">DIRECTOR</h2>
-                <div className="space-y-2">
+        <div className="flex h-screen bg-[#050510] text-white overflow-hidden">
+            {/* COLUMN 1: PHASES (Succession of folders) */}
+            <div className="w-64 bg-black/20 border-r border-white/10 flex flex-col">
+                <div className="p-4 border-b border-white/10">
+                    <button onClick={() => navigate('/')} className="text-white/50 hover:text-white text-sm">← Back</button>
+                    <h2 className="text-xl font-light tracking-widest mt-2">PHASES</h2>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {folders.map(folder => (
-                        <div
-                            key={folder.id}
-                            onClick={() => setActiveFolderId(folder.id)}
-                            className={`p-3 rounded-lg cursor-pointer transition-all ${activeFolderId === folder.id ? 'bg-cyan-500/20 border border-cyan-500/50' : 'bg-white/5 hover:bg-white/10 border border-transparent'}`}
-                        >
-                            <div className="font-medium">{folder.name}</div>
-                            <div className="text-xs text-white/40">{folder.moduleName}</div>
-                            <div className="text-xs text-white/30 mt-1">{folder.assets?.length || 0} Assets</div>
+                        <div key={folder.id} className="rounded-lg overflow-hidden transition-all border border-transparent hover:border-white/10 bg-white/5">
+                            <div
+                                onClick={() => setActiveFolderId(folder.id === activeFolderId ? null : folder.id)}
+                                className={`p-3 cursor-pointer flex justify-between items-center ${activeFolderId === folder.id ? 'bg-cyan-500/20 text-white' : 'text-white/60'}`}
+                            >
+                                <div className="font-medium truncate">{folder.name}</div>
+                                <div className="text-[10px] opacity-50">{activeFolderId === folder.id ? '▼' : '▶'}</div>
+                            </div>
+
+                            {/* Accordion Content: Thumbnails? or just info? User asked for thumbnails */}
+                            {activeFolderId === folder.id && (
+                                <div className="bg-black/20 p-2 grid grid-cols-4 gap-1 animate-[fadeIn_0.2s_ease-out]">
+                                    {folder.assets?.slice(0, 8).map((a: any) => (
+                                        <div key={a.id} className="aspect-square bg-white/10 rounded overflow-hidden opacity-60 hover:opacity-100">
+                                            {a.type === 'image' ? <img src={getAssetUrl(a.url)} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px]">{(a.type === 'video' ? '🎬' : '🎵')}</div>}
+                                        </div>
+                                    ))}
+                                    {folder.assets?.length > 8 && <div className="aspect-square flex items-center justify-center text-[8px] bg-white/5 text-white/30">+{folder.assets.length - 8}</div>}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col p-6 relative">
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+            {/* COLUMN 2: CENTER CONTROL (Dual Monitor + Induction) */}
+            <div className="flex-1 flex flex-col relative">
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
 
-                {/* Top Bar: Current Status */}
-                <div className="flex justify-between items-center mb-8 relative z-10">
-                    <div>
-                        <h1 className="text-3xl font-bold">{activeFolderId ? folders.find(f => f.id === activeFolderId)?.name : 'Select a Phase'}</h1>
-                        <p className="text-white/40">{isPlaying ? 'Running' : 'Paused'} • Intensity: {intensity}</p>
-                    </div>
-                    <div className="text-4xl font-mono opacity-50">
-                        {assets.length > 0 ? `${currentIndex + 1} / ${assets.length}` : '0 / 0'}
+                {/* Header */}
+                <div className="p-6 pb-2 z-10">
+                    <h1 className="text-2xl font-bold tracking-tight">{activeFolderId ? folders.find(f => f.id === activeFolderId)?.name : 'Select a Phase'}</h1>
+                    <div className="flex gap-4 text-sm text-white/40 mt-1 font-mono">
+                        <span>{isPlaying ? 'RUNNING' : 'PAUSED'}</span>
+                        <span>INTENSITY: {intensity}</span>
+                        <span>{assets.length > 0 ? `${currentIndex + 1}/${assets.length}` : '0/0'}</span>
                     </div>
                 </div>
 
-                {/* Center: Preview & Timer */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10">
-                    {assets.length > 0 && assets[currentIndex] ? (
-                        <div className="relative w-full max-w-2xl aspect-video bg-black/50 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
-                            {/* Timer Bar */}
-                            <div className="absolute top-0 left-0 h-1 bg-cyan-500 transition-all duration-100 ease-linear" style={{ width: `${(timeLeft / getIntervalMs()) * 100}%` }} />
+                {/* Dual Monitor Area */}
+                <div className="flex-1 grid grid-cols-2 gap-4 p-6 pt-2 overflow-hidden z-10">
+                    {/* Left: Now Playing (Controller View) */}
+                    <div className="bg-black/40 rounded-xl border border-white/10 flex flex-col overflow-hidden relative group">
+                        <div className="absolute top-2 left-2 z-20 bg-black/60 px-2 py-1 rounded text-[10px] font-bold tracking-widest text-cyan-400 border border-cyan-500/30">
+                            NOW PLAYING
+                        </div>
+                        {/* Timer Bar */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 z-30">
+                            <div className="h-full bg-cyan-500 transition-all duration-100 ease-linear" style={{ width: `${(timeLeft / getIntervalMs()) * 100}%` }} />
+                        </div>
 
-                            <img
-                                src={getAssetUrl(assets[currentIndex].url)}
-                                className="w-full h-full object-contain opacity-80"
-                                alt="Current"
-                            />
-                            <div className="absolute bottom-4 left-4 text-xs font-mono bg-black/50 px-2 py-1 rounded">
-                                NEXT IN: {(timeLeft / 1000).toFixed(1)}s
+                        <div className="flex-1 relative flex items-center justify-center bg-black/50">
+                            {currentAsset ? (
+                                assetPreview(currentAsset)
+                            ) : <div className="text-white/20">Idle</div>}
+                        </div>
+                        <div className="p-3 bg-black/60 border-t border-white/5">
+                            <div className="text-sm font-medium truncate">{currentAsset?.name || 'Unknown'}</div>
+                            <div className="text-xs text-white/40 font-mono">{currentAsset?.type}</div>
+                        </div>
+                    </div>
+
+                    {/* Right: Live Preview (Viewer View from Context) */}
+                    <div className="bg-black/40 rounded-xl border border-white/10 flex flex-col overflow-hidden relative">
+                        <div className="absolute top-2 left-2 z-20 bg-black/60 px-2 py-1 rounded text-[10px] font-bold tracking-widest text-pink-500 border border-pink-500/30 animate-pulse">
+                            LIVE VIEWER
+                        </div>
+                        <div className="flex-1 relative flex items-center justify-center bg-black/50">
+                            {activeState.currentAsset ? (
+                                assetPreview(activeState.currentAsset)
+                            ) : <div className="text-white/20">Waiting for Stream...</div>}
+                        </div>
+                        {/* Active Layers Indicators */}
+                        <div className="p-2 bg-black/60 border-t border-white/5 flex gap-2">
+                            {induction.spiral && <span className="text-[10px] px-1 bg-purple-500/20 text-purple-300 rounded border border-purple-500/30">SPIRAL</span>}
+                            {induction.flashback && <span className="text-[10px] px-1 bg-yellow-500/20 text-yellow-300 rounded border border-yellow-500/30">FLASHBACK</span>}
+                            {induction.breathing && <span className="text-[10px] px-1 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30">BREATHE</span>}
+                            {!induction.spiral && !induction.flashback && !induction.breathing && <span className="text-[10px] text-white/20">No active layers</span>}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Controls Area */}
+                <div className="h-48 bg-black/30 border-t border-white/10 p-6 z-20 flex gap-6">
+                    {/* Intensity & Transport */}
+                    <div className="flex-1 flex flex-col gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-cyan-400 tracking-widest mb-1 block">INTENSITY LEVEL</label>
+                                <input
+                                    type="range"
+                                    min="1" max="10"
+                                    value={intensity}
+                                    onChange={(e) => handleIntensityChange(Number(e.target.value))}
+                                    className="w-full accent-cyan-500 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                />
                             </div>
+                            <div className="text-2xl font-bold font-mono w-12 text-center">{intensity}</div>
                         </div>
-                    ) : (
-                        <div className="text-white/20 text-xl">No assets loaded</div>
-                    )}
+
+                        <div className="flex gap-2 h-full">
+                            <button onClick={togglePlay} className={`flex-1 rounded-lg font-bold text-xl border flex items-center justify-center transition-all ${isPlaying ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}>
+                                {isPlaying ? 'PAUSE' : 'PLAY'}
+                            </button>
+                            <button onClick={handleNextNow} className="flex-1 rounded-lg font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white flex flex-col items-center justify-center">
+                                <span>NEXT</span>
+                                <span className="text-[10px] opacity-50">SKIP TIMER</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Induction Controls */}
+                    <div className="w-1/3 flex flex-col gap-2">
+                        <label className="text-xs font-bold text-purple-400 tracking-widest mb-1 block">INDUCTION LAYERS</label>
+                        <div className="grid grid-cols-2 gap-2 flex-1">
+                            <button onClick={() => toggleInduction('spiral')} className={`rounded border text-xs font-bold transition-all ${induction.spiral ? 'bg-purple-500/30 border-purple-500 text-white' : 'bg-transparent border-white/10 text-white/50 hover:border-white/30'}`}>SPIRAL</button>
+                            <button onClick={() => toggleInduction('flashback')} className={`rounded border text-xs font-bold transition-all ${induction.flashback ? 'bg-yellow-500/30 border-yellow-500 text-white' : 'bg-transparent border-white/10 text-white/50 hover:border-white/30'}`}>GHOST</button>
+                            <button onClick={() => toggleInduction('breathing')} className={`rounded border text-xs font-bold transition-all ${induction.breathing ? 'bg-blue-500/30 border-blue-500 text-white' : 'bg-transparent border-white/10 text-white/50 hover:border-white/30'}`}>BREATHE</button>
+                            <button id="flash-btn" onClick={handleFlash} className="rounded border border-white/50 bg-white text-black font-bold text-xs hover:bg-white/90 active:scale-95 transition-transform">FLASH</button>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                {/* Bottom Control Bar */}
-                <div className="h-32 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 p-6 flex items-center justify-between gap-8 relative z-20 mt-6">
-
-                    {/* Intensity Slider */}
-                    <div className="flex-1">
-                        <div className="flex justify-between mb-2">
-                            <label className="text-sm font-bold tracking-widest text-cyan-400">INTENSITY</label>
-                            <span className="text-xl font-bold">{intensity}</span>
+            {/* COLUMN 3: PLAYLIST (Right Sidebar) */}
+            <div className="w-72 bg-black/20 border-l border-white/10 flex flex-col">
+                <div className="p-4 border-b border-white/10">
+                    <h2 className="text-sm font-bold tracking-widest text-white/70">PLAYLIST QUEUE</h2>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {assets.map((asset, idx) => (
+                        <div
+                            key={asset.id}
+                            onClick={() => jumpToAsset(idx)}
+                            className={`p-2 rounded flex gap-3 items-center cursor-pointer transition-all border ${currentIndex === idx ? 'bg-cyan-500/10 border-cyan-500/30' : 'border-transparent hover:bg-white/5'}`}
+                        >
+                            <div className="w-10 h-10 bg-black/40 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                {asset.type === 'image' ? <img src={getAssetUrl(asset.url)} className="w-full h-full object-cover opacity-70" /> : <span className="text-xs">{(asset.type === 'video' ? '🎬' : (asset.type === 'audio' ? '🎵' : 'GIF'))}</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className={`text-sm font-medium truncate ${currentIndex === idx ? 'text-cyan-400' : 'text-white/80'}`}>{asset.name || 'Untitled'}</div>
+                                <div className="text-[10px] text-white/30 truncate">{asset.type}</div>
+                            </div>
+                            {currentIndex === idx && <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>}
                         </div>
-                        <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={intensity}
-                            onChange={(e) => handleIntensityChange(Number(e.target.value))}
-                            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                        />
-                        <div className="flex justify-between text-xs text-white/30 mt-1">
-                            <span>Calm (10s)</span>
-                            <span>Intense (1s)</span>
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-4">
-                        <button
-                            id="flash-btn"
-                            onClick={handleFlash}
-                            className="h-16 w-32 bg-white text-black font-bold rounded-lg hover:bg-white/90 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                        >
-                            FLASH
-                        </button>
-
-                        <button
-                            onClick={handleNextNow}
-                            className="h-16 w-32 bg-cyan-600 text-white font-bold rounded-lg hover:bg-cyan-500 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,255,255,0.3)] flex flex-col items-center justify-center"
-                        >
-                            <span>NEXT</span>
-                            <span className="text-[10px] font-normal opacity-70">NOW</span>
-                        </button>
-
-                        <button
-                            onClick={togglePlay}
-                            className={`h-16 w-16 rounded-lg flex items-center justify-center font-bold text-2xl transition-all ${isPlaying ? 'bg-red-500/20 text-red-500 border border-red-500/50' : 'bg-green-500/20 text-green-500 border border-green-500/50'}`}
-                        >
-                            {isPlaying ? '⏸' : '▶'}
-                        </button>
-                    </div>
+                    ))}
+                    {assets.length === 0 && <div className="text-center text-white/30 py-10 text-sm">Select a phase to load playlist</div>}
                 </div>
             </div>
 
@@ -260,5 +325,14 @@ const DirectorPanel = () => {
         </div>
     );
 };
+
+// Helper for Preview
+const assetPreview = (asset: any) => {
+    const url = getAssetUrl(asset.url);
+    if (!url) return null;
+    if (asset.type === 'video') return <video src={url} className="w-full h-full object-contain opacity-80" autoPlay muted loop />;
+    if (asset.type === 'image' || asset.type === 'gif') return <img src={url} className="w-full h-full object-contain opacity-80" />;
+    return <div className="text-4xl">🎵</div>;
+}
 
 export default DirectorPanel;

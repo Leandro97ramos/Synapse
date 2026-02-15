@@ -4,10 +4,20 @@ import { useNavigate } from 'react-router-dom';
 const Sidebar = () => {
     const navigate = useNavigate();
 
+    const handleMediaLibraryClick = () => {
+        const lastModule = localStorage.getItem('lastModule');
+        if (lastModule) {
+            navigate(`/dashboard/${lastModule}`);
+        } else {
+            // Default or fetch modules to find first? For now default to 'Bubbles' or generic
+            navigate('/dashboard/Bubbles');
+        }
+    };
+
     const modules = [
-        { id: 1, name: 'Media Library', icon: '🎬', path: '/library' },
+        { id: 1, name: 'Media Library', icon: '🎬', action: handleMediaLibraryClick, path: null }, // distinct from path
         { id: 2, name: 'Director', icon: '🎮', path: '/director' },
-        { id: 3, name: 'Sessions', icon: '🕐', path: '/' }, // Assuming Home is Sessions or Dashboard
+        { id: 3, name: 'Sessions', icon: '🕐', path: '/' },
         { id: 4, name: 'Settings', icon: '⚙️', path: '/' },
     ];
 
@@ -23,7 +33,7 @@ const Sidebar = () => {
                 {modules.map((mod) => (
                     <button
                         key={mod.id}
-                        onClick={() => navigate(mod.path)}
+                        onClick={() => mod.path ? navigate(mod.path) : (mod.action && mod.action())}
                         className="w-full flex items-center space-x-3 p-3 rounded-lg text-white/70 hover:text-white hover:bg-white/10 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all duration-300 group text-left"
                     >
                         <span className="text-lg group-hover:scale-110 transition-transform duration-300">{mod.icon}</span>

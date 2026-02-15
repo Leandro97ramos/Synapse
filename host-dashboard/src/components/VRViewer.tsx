@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { io } from 'socket.io-client';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
@@ -113,13 +113,15 @@ const VRViewer = () => {
                 <color attach="background" args={['#000000']} />
                 <ambientLight intensity={1} />
 
-                {currentAsset && (currentAsset.type === 'image' || currentAsset.type === 'video' || currentAsset.type === 'gif') && (
-                    <VRMediaScreen
-                        type={currentAsset.type}
-                        url={getAssetUrl(currentAsset.url)}
-                        calibration={calibration}
-                    />
-                )}
+                <Suspense fallback={null}>
+                    {currentAsset && (currentAsset.type === 'image' || currentAsset.type === 'video' || currentAsset.type === 'gif') && (
+                        <VRMediaScreen
+                            type={currentAsset.type}
+                            url={getAssetUrl(currentAsset.url)}
+                            calibration={calibration}
+                        />
+                    )}
+                </Suspense>
             </Canvas>
 
             {/* HTML Overlay for Audio/UI Information */}

@@ -47,9 +47,60 @@ const handleCommand = (io, socket, event, data) => {
     socket.to('viewer').emit(event, data);
 };
 
+// --- NEW HANDLERS FOR EFFECTS & SYNC ---
+
+const sessionManager = require('../services/session.manager');
+
+// 1. FLASH
+const handleTriggerFlash = (io, socket, data) => {
+    sessionManager.logEvent('host:trigger_flash', data);
+    // Priority emit
+    io.of('/experience').to('viewer').emit('viewer:trigger_flash', data);
+};
+
+const triggerFlashRest = (req, res) => {
+    const io = req.app.get('io'); // Need to ensure io is accessible via app
+    const data = req.body;
+    handleTriggerFlash(io, null, data);
+    res.json({ message: 'Flash triggered' });
+};
+
+// 2. BREATHING
+const handleSetBreathing = (io, socket, data) => {
+    const rate = sessionManager.setBreathingRate(data);
+    io.of('/experience').to('viewer').emit('viewer:sync_breathing', rate);
+    if (socket) socket.emit('host:ack_breathing', rate);
+};
+
+const setBreathingRest = (req, res) => {
+    const io = req.app.get('io');
+    handleSetBreathing(io, null, req.body);
+    res.json({ message: 'Breathing rate updated', rate: sessionManager.getState().breathingRate });
+};
+
+// 3. LAYERS
+const handleToggleLayer = (io, socket, data) => {
+    const { layer, isActive } = data;
+    const layers = sessionManager.toggleLayer(layer, isActive);
+    io.of('/experience').to('viewer').emit('viewer:sync_layers', layers);
+    if (socket) socket.emit('host:ack_layers', layers);
+};
+
+const toggleLayerRest = (req, res) => {
+    const io = req.app.get('io');
+    handleToggleLayer(io, null, req.body);
+    res.json({ message: 'Layer toggled', layers: sessionManager.getState().activeLayers });
+};
+
 module.exports = {
     handleUpdateMedia,
     handleCalibration,
     handleUpdateSettings,
-    handleCommand
+    handleCommand,
+    handleTriggerFlash,
+    handleSetBreathing,
+    handleToggleLayer,
+    triggerFlashRest,
+    setBreathingRest,
+    toggleLayerRest
 };

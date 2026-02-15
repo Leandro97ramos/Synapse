@@ -26,6 +26,9 @@ app.use('/api/folders', foldersRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/profiles', profilesRoutes);
 app.use('/api/calibration', calibrationRoutes);
+app.use('/api/media', require('./routes/media.routes')); // NEW: Media/Phase Routes
+app.use('/api/session', require('./routes/session.routes')); // NEW: Effects & Sync Routes
+app.use('/api/dashboard', require('./routes/dashboard.routes')); // NEW: Playlist/Dashboard Routes
 
 app.get('/', (req, res) => {
     res.send('Synapse Relay Server Running');

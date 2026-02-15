@@ -30,9 +30,10 @@ export const createFolder = async (moduleId: number, name: string) => {
     return response.data;
 };
 
-export const createAsset = async (folderId: number | null, type: string, urlOrFile: string | File, name?: string) => {
+export const createAsset = async (folderId: number | null, type: string, urlOrFile: string | File, name?: string, moduleId?: number) => {
     const formData = new FormData();
     if (folderId) formData.append('folder_id', String(folderId));
+    if (moduleId) formData.append('module_id', String(moduleId)); // Added per user request
     formData.append('type', type);
     if (name) formData.append('name', name);
 
@@ -128,4 +129,8 @@ export const sendIntensity = (intensity: number) => {
 
 export const sendFlash = () => {
     socket.emit('host:flash', {});
+};
+
+export const sendInduction = (layer: string, active: boolean) => {
+    socket.emit('host:induction', { layer, active });
 };

@@ -25,7 +25,8 @@ CREATE TABLE `modules` (
   `category_type` VARCHAR(50) NOT NULL, -- e.g., 'relaxation', 'horror', 'cognitive'
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `global_settings` JSON NULL, -- Flexible module-wide config (e.g., {"speed": 1.5, "float_direction": "up"})
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  INDEX `idx_modules_name` (`name`) -- Optimize lookups by name
 ) ENGINE = InnoDB;
 
 -- -----------------------------------------------------
@@ -39,6 +40,7 @@ CREATE TABLE `folders` (
   `folder_settings` JSON NULL, -- Flexible folder config (e.g., {"play_mode": "random", "transition_speed": 2.0})
   PRIMARY KEY (`id`),
   INDEX `fk_folders_modules_idx` (`module_id` ASC),
+  INDEX `idx_folders_name` (`name`), -- Optimize lookups by name
   CONSTRAINT `fk_folders_modules`
     FOREIGN KEY (`module_id`)
     REFERENCES `modules` (`id`)
@@ -49,15 +51,24 @@ CREATE TABLE `folders` (
 -- -----------------------------------------------------
 -- Table: assets
 -- -----------------------------------------------------
+-- -----------------------------------------------------
+-- Table: assets
+-- -----------------------------------------------------
 CREATE TABLE `assets` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `folder_id` INT NULL, -- Now Nullable for unlinked assets
   `name` VARCHAR(255) NULL, -- Added Name column
   `type` ENUM('image', 'audio', 'video', 'gif', 'special') NOT NULL,
+  `mimetype` VARCHAR(100) NULL, -- real mime-type (e.g., 'image/png')
+  `module` ENUM('Bubbles', 'Paisajes', 'Terror', 'Adrenalina', 'Sleep') NOT NULL DEFAULT 'Bubbles', -- Direct Module Link
   `url` VARCHAR(255) NOT NULL,
-  `asset_settings` JSON NULL, -- Flexible asset config (e.g., {"volume": 0.8, "heartbeat_rate": 60})
+  `intensity_level` INT NOT NULL DEFAULT 1, -- 1-10 Scale
+  `phase_name` VARCHAR(50) NULL, -- e.g., 'warmup', 'plateau', 'peak'
+  `asset_settings` JSON NULL, -- Flexible asset config
   PRIMARY KEY (`id`),
   INDEX `fk_assets_folders_idx` (`folder_id` ASC),
+  INDEX `idx_assets_intensity_type` (`intensity_level`, `type`), -- Optimize intensity queries
+  INDEX `idx_assets_module` (`module`), -- Optimize module filtering
   CONSTRAINT `fk_assets_folders`
     FOREIGN KEY (`folder_id`)
     REFERENCES `folders` (`id`)
@@ -92,6 +103,63 @@ CREATE TABLE `calibration_profiles` (
     REFERENCES `users` (`id`)
     ON DELETE CASCADE
     ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table: session_logs
+-- -----------------------------------------------------
+CREATE TABLE `session_logs` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `session_id` VARCHAR(100) NOT NULL, -- Socket ID or Session UUID
+  `user_id` INT NULL,
+  `action` VARCHAR(50) NOT NULL, -- 'start', 'asset_change', 'intensity_change', 'end'
+  `details` JSON NULL, -- Stores asset_id, new_intensity, etc.
+  `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `idx_session_logs_session` (`session_id`),
+  INDEX `idx_session_logs_timestamp` (`timestamp`)
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table: overlays
+-- -----------------------------------------------------
+CREATE TABLE `overlays` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `url` VARCHAR(255) NOT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `linked_folder_ids` JSON NULL, -- Array of folder IDs this overlay applies to. NULL = Global.
+  `settings` JSON NULL, -- e.g., opacity, blend mode
+  PRIMARY KEY (`id`)
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table: playlists
+-- -----------------------------------------------------
+CREATE TABLE `playlists` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `folder_id` INT NOT NULL,
+  `name` VARCHAR(255) NULL, -- Optional name
+  `asset_order` JSON NOT NULL, -- Array of Asset IDs
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  INDEX `fk_playlists_folders_idx` (`folder_id` ASC),
+  CONSTRAINT `fk_playlists_folders`
+    FOREIGN KEY (`folder_id`)
+    REFERENCES `folders` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table: system_settings
+-- -----------------------------------------------------
+CREATE TABLE `system_settings` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `setting_key` VARCHAR(100) NOT NULL UNIQUE, -- e.g., 'default_effects'
+  `setting_value` JSON NOT NULL, -- Stores the actual value or object
+  `description` VARCHAR(255) NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE = InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -140,31 +208,76 @@ VALUES (
 );
 
 
--- Get the ID of the inserted module (assuming it's ID 1 for this script, or using a variable in a stored procedure context, 
--- but for standard SQL scripts we often assume sequential execution or subqueries)
-
--- 2. Insert 'Carpeta 1' Folder for Bubbles
+-- 5. Create Folders for Phases (Low, Medium, High)
 INSERT INTO `folders` (`module_id`, `name`, `intensity_level`, `folder_settings`) 
-SELECT `id`, 'Carpeta 1', 1, '{"play_mode": "random", "transition_speed": 2.0}' 
+SELECT `id`, 'Warmup (Low)', 2, '{"play_mode": "sequential", "transition_speed": 3.0}' 
 FROM `modules` WHERE `name` = 'Bubbles' LIMIT 1;
 
--- 3. Insert Assets for 'Carpeta 1'
--- We'll use a variable or subquery to get the folder ID. Here using subquery for portability in simple scripts.
+INSERT INTO `folders` (`module_id`, `name`, `intensity_level`, `folder_settings`) 
+SELECT `id`, 'Plateau (Medium)', 5, '{"play_mode": "random", "transition_speed": 2.0}' 
+FROM `modules` WHERE `name` = 'Bubbles' LIMIT 1;
 
--- Asset 1: Image
-INSERT INTO `assets` (`folder_id`, `type`, `url`, `asset_settings`)
-SELECT `id`, 'image', 'https://example.com/assets/bubble_01.png', '{"opacity": 0.9, "scale": 1.2}'
-FROM `folders` WHERE `name` = 'Carpeta 1' AND `module_id` = (SELECT `id` FROM `modules` WHERE `name` = 'Bubbles');
+INSERT INTO `folders` (`module_id`, `name`, `intensity_level`, `folder_settings`) 
+SELECT `id`, 'Peak (High)', 9, '{"play_mode": "random", "transition_speed": 1.0}' 
+FROM `modules` WHERE `name` = 'Bubbles' LIMIT 1;
 
--- Asset 2: Audio
-INSERT INTO `assets` (`folder_id`, `type`, `url`, `asset_settings`)
-SELECT `id`, 'audio', 'https://example.com/assets/ocean_waves.mp3', '{"volume": 0.5, "loop": true}'
-FROM `folders` WHERE `name` = 'Carpeta 1' AND `module_id` = (SELECT `id` FROM `modules` WHERE `name` = 'Bubbles');
 
--- Asset 3: Special (e.g., Haptic feedback or integrated effect)
-INSERT INTO `assets` (`folder_id`, `type`, `url`, `asset_settings`)
-SELECT `id`, 'special', 'https://example.com/assets/heartbeat_pattern.json', '{"effect": "heartbeat", "intensity": 0.7}'
-FROM `folders` WHERE `name` = 'Carpeta 1' AND `module_id` = (SELECT `id` FROM `modules` WHERE `name` = 'Bubbles');
+-- 6. Insert Assets Distributed by Phase/Intensity
+
+-- --- Warmup (Level 1-3) ---
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Soft Bubbles', 'image', 'https://example.com/assets/bubble_soft.png', 1, 'warmup', '{"opacity": 0.8, "scale": 1.0}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Warmup (Low)' AND m.name = 'Bubbles';
+
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Slow Waves', 'audio', 'https://example.com/assets/waves_slow.mp3', 2, 'warmup', '{"volume": 0.4, "loop": true}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Warmup (Low)' AND m.name = 'Bubbles';
+
+-- --- Plateau (Level 4-7) ---
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Active Bubbles', 'image', 'https://example.com/assets/bubble_active.png', 5, 'plateau', '{"opacity": 1.0, "scale": 1.2}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Plateau (Medium)' AND m.name = 'Bubbles';
+
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Rhythmic Beat', 'audio', 'https://example.com/assets/beat_medium.mp3', 6, 'plateau', '{"volume": 0.6, "bpm": 80}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Plateau (Medium)' AND m.name = 'Bubbles';
+
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Floating Animation', 'gif', 'https://example.com/assets/floating.gif', 5, 'plateau', '{"speed": 1.0}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Plateau (Medium)' AND m.name = 'Bubbles';
+
+
+-- --- Peak (Level 8-10) ---
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Stormy Bubbles', 'image', 'https://example.com/assets/bubble_storm.png', 9, 'peak', '{"opacity": 1.0, "scale": 1.5}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Peak (High)' AND m.name = 'Bubbles';
+
+INSERT INTO `assets` (`folder_id`, `name`, `type`, `url`, `intensity_level`, `phase_name`, `asset_settings`)
+SELECT f.id, 'Intense Pulse', 'special', 'https://example.com/assets/haptic_pulse.json', 10, 'peak', '{"intensity": 1.0, "duration": 500}'
+FROM `folders` f JOIN `modules` m ON f.module_id = m.id WHERE f.name = 'Peak (High)' AND m.name = 'Bubbles';
+
+
+-- 7. Insert Overlays
+-- 'Hypnotic Spiral' linked to Peak (High) - Assuming ID derived from previous inserts, but for seed we used subqueries or assumptions. 
+-- Valid JSON for linked_folders: we need to know the ID.
+-- Since this is a script, we will insert them as Global (NULL) first, or use a complex INSERT-SELECT if strictness required.
+-- For simplicity in this generated script, we will keep them Global or update the linked_folder_ids logic if we had simpler IDs.
+-- Let's stick to NULL (Global) for Sacred Geometry, and try to target Peak for Spiral if possible.
+-- Given the complexity of getting the exact ID in a pure SQL script without variables on all environments,
+-- We will insert them as NULL (Global) for now, or use a placeholder.
+INSERT INTO `overlays` (`name`, `url`, `is_active`, `linked_folder_ids`, `settings`) VALUES
+('Hypnotic Spiral', 'https://example.com/assets/spiral_01.png', 1, NULL, '{"opacity": 0.5, "blend_mode": "multiply"}'),
+('Sacred Geometry', 'https://example.com/assets/geometry_01.png', 1, NULL, '{"opacity": 0.3, "blend_mode": "screen"}');
+
+-- 8. Insert Playlists (Example logic)
+-- We need asset IDs. In a real scenario, we'd query them.
+-- Here we'll just insert a dummy playlist for 'Warmup' assuming we have assets there.
+-- INSERT INTO `playlists` ... 
+-- Skipped to avoid ID mismatch errors in direct execution without variables. System handles dynamic creation.
+
+-- 9. Insert System Settings
+INSERT INTO `system_settings` (`setting_key`, `setting_value`, `description`) VALUES
+('default_effects', '{"breathing_rate": 4000, "flash_colors": ["#FFFFFF", "#FF0000", "#0000FF"], "spiral_rotation_speed": 0.5}', 'Default VR effects configuration');
 
 -- -----------------------------------------------------
 -- Triggers for Default JSON Values (MySQL 5.7 Compatibility)
@@ -203,16 +316,19 @@ END;
 DELIMITER ;
 
 -- -----------------------------------------------------
--- Debug Query: Count assets per active module
+-- Debug Query: Count assets per phase
 -- -----------------------------------------------------
 /*
 SELECT 
-    m.name AS ModuleName, 
-    COUNT(a.id) AS TotalAssets,
-    m.is_active
+    m.name AS Module,
+    f.name AS Phase,
+    a.phase_name,
+    COUNT(a.id) AS AssetCount,
+    MIN(a.intensity_level) AS MinIntensity,
+    MAX(a.intensity_level) AS MaxIntensity
 FROM modules m
-LEFT JOIN folders f ON m.id = f.module_id
-LEFT JOIN assets a ON f.id = a.folder_id
-GROUP BY m.id;
+JOIN folders f ON m.id = f.module_id
+JOIN assets a ON f.id = a.folder_id
+GROUP BY m.name, f.name, a.phase_name;
 */
 

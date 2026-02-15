@@ -18,12 +18,14 @@ const modulesRoutes = require('./routes/modules.routes');
 const foldersRoutes = require('./routes/folders.routes');
 const assetsRoutes = require('./routes/assets.routes');
 const profilesRoutes = require('./routes/profiles.routes');
+const calibrationRoutes = require('./routes/calibration.routes');
 
 app.use('/api/bubbles', bubblesRoutes); // Keep for backward compatibility if needed, or deprecate
 app.use('/api/modules', modulesRoutes);
 app.use('/api/folders', foldersRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/profiles', profilesRoutes);
+app.use('/api/calibration', calibrationRoutes);
 
 app.get('/', (req, res) => {
     res.send('Synapse Relay Server Running');

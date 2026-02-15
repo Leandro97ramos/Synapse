@@ -120,3 +120,12 @@ export const getProfiles = async (userId: number) => {
     const response = await api.get(`/profiles/${userId}`);
     return response.data;
 };
+
+// Director Controls
+export const sendIntensity = (intensity: number) => {
+    socket.emit('host:intensity', { intensity });
+};
+
+export const sendFlash = () => {
+    socket.emit('host:flash', {});
+};

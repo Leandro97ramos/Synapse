@@ -1,10 +1,14 @@
 
+import { useNavigate } from 'react-router-dom';
 
 const Sidebar = () => {
+    const navigate = useNavigate();
+
     const modules = [
-        { id: 1, name: 'Media Library', icon: '🎬' },
-        { id: 2, name: 'Sessions', icon: '🕐' },
-        { id: 3, name: 'Settings', icon: '⚙️' },
+        { id: 1, name: 'Media Library', icon: '🎬', path: '/library' },
+        { id: 2, name: 'Director', icon: '🎮', path: '/director' },
+        { id: 3, name: 'Sessions', icon: '🕐', path: '/' }, // Assuming Home is Sessions or Dashboard
+        { id: 4, name: 'Settings', icon: '⚙️', path: '/' },
     ];
 
     return (
@@ -19,7 +23,8 @@ const Sidebar = () => {
                 {modules.map((mod) => (
                     <button
                         key={mod.id}
-                        className="w-full flex items-center space-x-3 p-3 rounded-lg text-white/70 hover:text-white hover:bg-white/10 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all duration-300 group"
+                        onClick={() => navigate(mod.path)}
+                        className="w-full flex items-center space-x-3 p-3 rounded-lg text-white/70 hover:text-white hover:bg-white/10 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] transition-all duration-300 group text-left"
                     >
                         <span className="text-lg group-hover:scale-110 transition-transform duration-300">{mod.icon}</span>
                         <span className="font-medium tracking-wide">{mod.name}</span>

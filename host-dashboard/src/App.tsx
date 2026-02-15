@@ -5,6 +5,7 @@ import FolderPanel from './components/FolderPanel';
 import AssetViewer from './components/AssetViewer';
 import GlobalLibrary from './components/GlobalLibrary';
 import VRViewer from './components/VRViewer';
+import DirectorPanel from './components/DirectorPanel';
 import CalibrationPanel from './components/CalibrationPanel'; // Added Import
 import Home from './pages/Home';
 
@@ -38,6 +39,7 @@ function App() {
 
                 <Routes>
                   <Route path="/" element={<Home />} />
+                  <Route path="/director" element={<DirectorPanel />} />
                   <Route path="/library" element={<GlobalLibrary />} />
                   <Route path="/dashboard/:moduleName" element={<FolderPanel />} />
                   <Route path="/dashboard/:moduleName/folder/:folderId" element={<AssetViewer />} />

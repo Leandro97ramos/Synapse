@@ -16,23 +16,35 @@ const StereoRenderer = ({ calibration }: { calibration: any }) => {
         const { width, height } = size;
         const halfWidth = width / 2;
 
-        // El IPD divide el valor del slider para un movimiento sutil de cámara
-        // Ajuste: El slider suele ir de -50 a 50 (mm?). 
-        // Si la escena está en metros (z=5), 50mm = 0.05 units.
-        // User suggirió / 1000. Probemos eso o un valor razonable.
-        const ipdOffset = (calibration.ipd || 0) * 0.005;
+        // Map IPD (0-250 typically mm) to World Units (assuming 1 unit = 1 meter approx, or scaled)
+        // Standard IPD is ~60-70mm. 
+        // If scene is standard scale, 65mm = 0.065 units.
+        // Let's assume input is in mm.
+        // Also applying a factor to make the effect visible/tunable.
+        const ipdWorld = (calibration.ipd || 0) * 0.001 * 0.5; // ipd is total distance, so offset is half
+
+        // Map Vertical Offset (-100 to 100) to Camera Y
+        const vOffsetWorld = (calibration.vOffset || 0) * 0.05;
 
         // 1. Preparamos el renderizador
         gl.autoClear = false;
         gl.clear();
         gl.setScissorTest(true);
 
+        // Store original camera transformations
+        const originalX = camera.position.x;
+        const originalY = camera.position.y;
+
+        // Apply Vertical Offset to Camera Base Position (affects both eyes)
+        // Actually, we usually want to move the camera UP/DOWN to shift the view.
+        // Moving camera UP moves objects DOWN.
+        camera.position.y = originalY + vOffsetWorld;
+
         // 2. RENDER OJO IZQUIERDO
         gl.setViewport(0, 0, halfWidth, height);
         gl.setScissor(0, 0, halfWidth, height);
 
-        const originalX = camera.position.x;
-        camera.position.x = originalX - ipdOffset; // Desplazamos cámara a la izquierda
+        camera.position.x = originalX - ipdWorld; // Desplazamos cámara a la izquierda
         camera.updateMatrixWorld();
 
         gl.render(scene, camera);
@@ -41,13 +53,14 @@ const StereoRenderer = ({ calibration }: { calibration: any }) => {
         gl.setViewport(halfWidth, 0, halfWidth, height);
         gl.setScissor(halfWidth, 0, halfWidth, height);
 
-        camera.position.x = originalX + ipdOffset; // Desplazamos cámara a la derecha
+        camera.position.x = originalX + ipdWorld; // Desplazamos cámara a la derecha
         camera.updateMatrixWorld();
 
         gl.render(scene, camera);
 
-        // Restaurar posición original para el siguiente frame (si orbit controls u otros lo usaran)
+        // Restaurar posición original para el siguiente frame
         camera.position.x = originalX;
+        camera.position.y = originalY;
 
         // 4. Limpieza para el siguiente frame
         gl.setScissorTest(false);

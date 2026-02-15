@@ -14,6 +14,7 @@ const DistortionMaterial = shaderMaterial(
     uK2: 0.05, // Distortion coefficient 2
     uScale: 1.0, // Scale adjustment
     uIpD: 0.0, // Per-eye offset (optional in shader, but usually handled by camera position)
+    uOpacity: 1.0, // Opacity for fading
   },
   // Vertex Shader
   `
@@ -29,6 +30,7 @@ const DistortionMaterial = shaderMaterial(
     uniform float uK1;
     uniform float uK2;
     uniform float uScale;
+    uniform float uOpacity;
     
     varying vec2 vUv;
 
@@ -41,10 +43,6 @@ const DistortionMaterial = shaderMaterial(
       
       // Calculate distortion
       // r_new = r * (1 + k1*r^2 + k2*r^4)
-      // This pushes pixels away from center (pincushion) or pulls them in (barrel) based on K sign
-      // For VR (Barrel distortion needed on screen to counteract Pincushion of lens), K should be positive??
-      // Actually lenses create pincushion, so we need barrel on screen.
-      // Barrel formula: r_src = r_dest * (1 + k1 * r_dest^2 ...)
       
       float r2 = r * r;
       float f = 1.0 + uK1 * r2 + uK2 * r2 * r2;
@@ -57,9 +55,10 @@ const DistortionMaterial = shaderMaterial(
       
       // Check bounds
       if (uv_distorted.x < 0.0 || uv_distorted.x > 1.0 || uv_distorted.y < 0.0 || uv_distorted.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Black out of bounds
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0); // Transparent black out of bounds
       } else {
-        gl_FragColor = texture2D(uTexture, uv_distorted);
+        vec4 color = texture2D(uTexture, uv_distorted);
+        gl_FragColor = vec4(color.rgb, color.a * uOpacity);
       }
     }
   `

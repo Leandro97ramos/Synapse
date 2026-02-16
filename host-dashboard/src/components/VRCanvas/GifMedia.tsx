@@ -11,7 +11,7 @@ import GifLoader from 'three-gif-loader';
 class PatchedGifLoader extends (GifLoader as unknown as typeof THREE.TextureLoader) {
     load(url: string, onLoad: (texture: any) => void, onProgress?: (event: ProgressEvent) => void, onError?: (event: unknown) => void) {
         // Call super.load but intercept the callback
-        const texture = super.load(url, (reader: any) => {
+        const texture = super.load(url, (_reader: any) => {
             // super.load calls this callback with 'reader' when done.
             // But we want to resolve the promise inside useLoader with 'texture'.
             if (onLoad) {

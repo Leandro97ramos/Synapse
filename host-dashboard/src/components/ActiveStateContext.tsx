@@ -8,6 +8,7 @@ interface ActiveState {
     layers: {
         spiral: boolean;
         flashback: boolean;
+        breathing: boolean;
     };
 }
 
@@ -25,40 +26,50 @@ export const ActiveStateProvider = ({ children }: { children: React.ReactNode })
         layers: {
             spiral: false,
             flashback: false,
+            breathing: false,
         }
     });
 
     useEffect(() => {
-        // Join a room to receive updates? 
-        // If Relay broadcasts to 'viewer', maybe we should join 'viewer' too to stay in sync?
-        // Or 'monitor' room?
-        // For now, let's join 'viewer' so we see exactly what they see.
+        // Join 'host-watch' room to receive updates that are broadcasted to 'viewer' or specifically for monitoring
+        // Ideally we should listen to 'viewer' room events if we want to see exactly what they see.
         socket.emit('join_room', 'viewer');
 
         const handleUpdate = (data: any) => {
-            console.log('Monitor received update:', data);
+            console.log('Monitor received update session:', data);
             setActiveState(prev => ({
                 ...prev,
-                currentAsset: data.asset || prev.currentAsset,
-                // If backend sends intensity/layers in update_session, update here.
-                // Currently only asset is sent in 'update_session' based on previous code.
-                // We might need to standardise the event payload to include full state.
+                currentAsset: data.asset?.url ? data.asset : prev.currentAsset,
             }));
         };
 
-        const handleCalibration = (data: any) => {
-            // Handle calibration updates if useful for monitor
+        const handleInduction = (data: { layer: string; active: boolean }) => {
+            console.log('Monitor received induction:', data);
+            setActiveState(prev => ({
+                ...prev,
+                layers: {
+                    ...prev.layers,
+                    [data.layer]: data.active
+                }
+            }));
         };
 
-        // We should also listen to 'host:intensity' if it's broadcasted back?
-        // Usually Relay broadcasts to 'viewer'. 
-        // If we emit host:intensity, relay might broadcast viewer:intensity?
-        // Let's assume we need to listen to all 'viewer:*' events.
+        const handleFlash = () => {
+            // We might want to trigger a temporary flash state or just let the component handle the event if it listens directly.
+            // But context is better for global state. 
+            // However, flash is transient. We can use a timestamp or toggle to trigger effects.
+            // For now, let's just log it. Components can listen to socket directly for transient effects or we add a 'lastFlash' timestamp.
+            console.log('Monitor received flash');
+        };
 
         socket.on('viewer:update_session', handleUpdate);
+        socket.on('viewer:induction', handleInduction);
+        socket.on('viewer:flash', handleFlash);
 
         return () => {
             socket.off('viewer:update_session', handleUpdate);
+            socket.off('viewer:induction', handleInduction);
+            socket.off('viewer:flash', handleFlash);
             socket.emit('leave_room', 'viewer');
         };
     }, []);

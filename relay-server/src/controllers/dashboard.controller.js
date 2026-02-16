@@ -120,14 +120,20 @@ exports.handleManualSelectItem = (io, socket, data) => {
     // data: { assetId, url, type, ... }
     console.log('Manual Select Item:', data);
 
-    // Validate Viewer Presence
-    if (sessionManager.getState().activeViewers === 0) {
-        if (socket) socket.emit('host:warning', { message: 'No viewers connected to play this item.' });
-        return;
-    }
+    // Update Session State
+    sessionManager.setCurrentMedia(data);
 
-    // Force Play on Viewer
+    // Validate Viewer Presence (Optional, maybe allow director to see it even if no viewer?)
+    // But request said "Force Play on Viewer".
+
+    // Broadcast to Viewers
     io.of('/experience').to('viewer').emit('viewer:force_play', data);
+
+    // Broadcast to Directors
+    io.of('/experience').to('director').emit('director:monitor_update', {
+        type: 'MEDIA_CHANGE',
+        data: data
+    });
 
     if (socket) socket.emit('host:ack_select_item', { success: true, item: data });
 };

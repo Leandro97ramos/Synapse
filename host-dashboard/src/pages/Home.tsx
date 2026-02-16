@@ -64,9 +64,19 @@ const Home = () => {
                     </span>
                 </div>
 
-                <div className="flex items-center space-x-4 pl-4 border-l border-white/10 bg-white/5 rounded-full p-1 pr-4 backdrop-blur-md">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-inner border border-white/20"></div>
-                    <span className="text-xs font-medium tracking-wide text-white/80 uppercase">Host</span>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => navigate('/viewer')}
+                        className="flex items-center space-x-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all group backdrop-blur-md"
+                    >
+                        <span className="text-xl opacity-80 group-hover:scale-110 transition-transform">👓</span>
+                        <span className="text-xs font-bold tracking-widest text-white/80 uppercase group-hover:text-cyan-400">Enter VR</span>
+                    </button>
+
+                    <div className="flex items-center space-x-4 pl-4 border-l border-white/10 bg-white/5 rounded-full p-1 pr-4 backdrop-blur-md">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-inner border border-white/20"></div>
+                        <span className="text-xs font-medium tracking-wide text-white/80 uppercase">Host</span>
+                    </div>
                 </div>
             </nav>
 

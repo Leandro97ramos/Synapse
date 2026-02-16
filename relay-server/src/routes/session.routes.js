@@ -13,4 +13,8 @@ router.get('/state', (req, res) => {
     res.json(sessionManager.getState());
 });
 
+// Playlist Management
+router.post('/playlist', sessionController.setPlaylistRest);
+router.post('/playlist/reorder', sessionController.reorderPlaylistRest);
+
 module.exports = router;

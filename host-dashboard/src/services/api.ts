@@ -12,7 +12,8 @@ const api = axios.create({
 });
 
 export const socket = io(SOCKET_URL, {
-    transports: ['websocket', 'polling']
+    transports: ['websocket'], // Force WebSocket to reduce overhead & polling latency
+    upgrade: false
 });
 
 export const getModules = async () => {

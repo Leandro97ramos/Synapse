@@ -28,7 +28,8 @@ const io = socketIo(server, {
     cors: {
         origin: "*", // Allow all origins explicitly for development
         methods: ["GET", "POST"]
-    }
+    },
+    perMessageDeflate: false // Latency Optimization: Disable compression for small, high-frequency packets
 });
 
 // Socket.io Middleware
